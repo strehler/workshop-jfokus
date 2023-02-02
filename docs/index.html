@@ -1,0 +1,641 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+		<title>reveal.js</title>
+
+		<link rel="stylesheet" href="dist/reset.css">
+		<link rel="stylesheet" href="dist/reveal.css">
+		<link rel="stylesheet" href="dist/theme/blood.css">
+
+		<!-- Theme used for syntax highlighted code -->
+		<link rel="stylesheet" href="plugin/highlight/monokai.css">
+	</head>
+	<body>
+		<div class="reveal">
+			<div class="slides">
+
+				<section data-markdown>
+					<textarea data-template>
+						### Write You An Actor (System) For Great Good!
+						with JBang, JDK 19, records, pattern matching and virtual threads!
+					</textarea>
+				</section>
+
+				<section>
+
+					<img src="imgs/self.jpg" height="30%" width="30%" style="float:left; margin-left:5em; position: relative;">
+
+					<br>
+
+					<h4>Andrea Peruffo</h3>  
+						
+					<p> @and_prf
+						
+					<h4 style="margin-top:1em">Edoardo Vacchi</h3>  
+					<p> @evacchi
+
+
+				</section>				
+
+				<section >
+					<img src="imgs/web.png" height="80%" width="80%">
+
+					<p> evacchi.github.io
+				</section>				
+
+				<!-- REQUIREMENTS -->
+				<section>
+					<section data-markdown>
+						<textarea data-template>
+							### Software Requirements
+						</textarea>
+					</section>
+
+					<section data-markdown>
+						<textarea data-template>
+						In order to do this workshop, you need the following:
+
+						https://bit.ly/actor19
+
+						1. Linux or MacOS with shell access, and `git` installed
+						2. [`jbang`](https://www.jbang.dev/documentation/guide/latest/installation.html)
+						3. <span style="font-size:.7em">`git clone git@github.com:strehler/workshop-jbcn.git`</span>
+						4. (optionally) JDK 19
+						</textarea>
+					</section>
+
+					<section data-markdown>
+						<textarea data-template>
+							Suggested JDK 19 installation with [`sdkman`](https://sdkman.io/)
+
+							```bash
+								$ sdk install java 19.0.2-tem
+								$ sdk use java 19.0.2-tem
+								$ java -version
+								| openjdk 19.0.2 2023-01-17
+								| OpenJDK Runtime Environment Temurin-19.0.2+7 (build 19.0.2+7)
+								| OpenJDK 64-Bit Server VM Temurin-19.0.2+7 (build 19.0.2+7, mixed mode, sharing)
+							```
+						</textarea>
+					</section>
+
+
+					<section data-markdown>
+						<textarea data-template>
+							### JBang
+
+							Unprecedented Java experience at your fingertips:
+
+							```bash
+							$ jbang init hello.java
+							$ ./hello.java
+							| [jbang] Building jar...
+							| Hello World
+							```
+						</textarea>
+					</section>
+
+					<section data-markdown>
+						<textarea data-template>
+							### DIY hello.java
+
+							- initialize a script:
+							```bash
+							jbang init hello.java
+							```
+
+							- configure `jbang` by adding from the second line:
+							```
+							//JAVA 19
+							//JAVAC_OPTIONS --enable-preview --release 19
+							//JAVA_OPTIONS  --enable-preview
+							```
+
+							- (optional) use Java 19 idioms
+							- run it!
+						</textarea>
+					</section>
+				</section>
+
+				<!-- INTRODUCTION -->
+				<section>
+					<section data-markdown>
+						<textarea data-template>
+							### Goals
+						</textarea>
+					</section>
+
+					<section data-markdown>
+						<textarea data-template>
+							### What's new with the JDK?
+
+							- JDK 17 is the LTS
+							- You should not wait to upgrade
+							- A walkthrough of the latest changes in JDK 17
+							- Bonus: a sneak peek in what is possible with JDK 19
+						</textarea>
+					</section>
+
+					<section data-markdown>
+						<textarea data-template>
+							### Finding a Running Example
+
+							- An example to exercise brand new JDK features
+							- In a fun way
+							- You will learn all the new features
+							- ...with a nontrivial example (an actor runtime!)
+						</textarea>
+					</section>
+				</section>
+
+
+
+				<!-- THE ACTOR MODEL -->
+				<section>
+					<section data-markdown>
+						<textarea data-template>
+							### The Actor Model
+						</textarea>
+					</section>
+
+					<section data-markdown>
+						<!-- practical example, test jbang env -->
+						<textarea data-template>
+						```java
+sealed interface Pong {}
+record SimplePong(Address<Ping> sender, int count) implements Pong {}
+record DeadlyPong(Address<Ping> sender) implements Pong {}
+
+record Ping(Address<Pong> sender, int count) {}
+
+static void main(String... args) {
+    var actorSystem = new TypedActor.System(Executors.newCachedThreadPool());
+    Address<Ping> ponger = actorSystem.actorOf(self -> msg -> pongerBehavior(self, msg));
+    Address<Pong> pinger = actorSystem.actorOf(self -> msg -> pingerBehavior(self, msg));
+    ponger.tell(new Ping(pinger, 10));
+}
+static Effect<Ping> pongerBehavior(Address<Ping> self, Ping msg) {
+    if (msg.count() > 0) {
+        out.println("ping! 👉");
+        msg.sender().tell(new SimplePong(self, msg.count() - 1));
+        return Stay();
+    } else {
+        out.println("ping! 💀");
+        msg.sender().tell(new DeadlyPong(self));
+        return Die();
+    }
+}
+static Effect<Pong> pingerBehavior(Address<Pong> self, Pong msg) {
+    return switch (msg) {
+        case SimplePong(var sender, var count) -> {
+            out.println("pong! 👈");
+            sender.tell(new Ping(self, count - 1));
+            yield Stay();
+        }
+        case DeadlyPong p -> {
+            out.println("pong! 😵");
+            yield Die();
+        }
+    };
+}
+						</textarea>
+					</section>
+
+					<section data-markdown>
+						<textarea data-template>
+						### The Actor Model
+
+						- Concurrency Model
+						- Simple
+						- "Single-Thread" reasoning
+						- Message-based, "Mailbox"
+						</textarea>
+					</section>
+
+					<section data-markdown>
+						<textarea data-template>
+							### The Actor Model
+					
+							- Modelling stateful systems
+							- Distributed systems (e.g. leveraging location transparency)
+							- IoT (e.g. Digital twins)
+							- ...
+						</textarea>
+					</section>
+
+					<section data-markdown>
+						<textarea data-template>
+							
+							An [actor](https://en.wikipedia.org/wiki/Actor_model) is a **computational entity** that, 
+							*in response to a message* it receives, can concurrently:
+							
+							- **send** a finite number of messages to other actors;
+							- **create** a finite number of new actors;
+							- **designate the behavior** to be used for the next message it receives.
+
+							"Everything" is an actor.
+						</textarea>
+					</section>
+				</section>
+
+				<section>
+					<!-- LANDSCAPE -->
+						
+	
+						<!-- we can show the cool version again for reference -->
+	
+						<section data-markdown>
+							<textarea data-template>
+								### Erlang
+						
+								```erlang
+pingponger(Name, Main) ->
+  receive
+    {ping, Count, Ping_PID} ->
+      io:format("~s received ping, count down ~w~n", [Name, Count]),
+      if Count > 0 ->
+        Ping_PID ! {ping, Count - 1, self()},
+        pingponger(Name, Main);
+      true ->
+        exit ("done")
+      end
+  end.
+
+main(_) ->
+  Ping1_PID = spawn(fun() -> pingponger("pinger", self()) end),
+  Ping2_PID = spawn(fun() -> pingponger("ponger", self()) end),
+  Ping1_PID ! {ping, 10, Ping2_PID}.
+								```
+							</textarea>
+						</section>
+	
+						<section data-markdown>
+							<textarea data-template>
+								### Elixir
+	
+								```elixir
+defmodule Main do
+  def pingponger(name) do
+    receive do
+      {:ping, count, sender} ->
+        IO.puts "#{name} received ping, count down #{count}"
+        if count > 0 do
+          send sender, {:ping, count - 1, self()}
+          pingponger(name)
+        else
+          :ok
+        end
+    end
+  end
+end
+	
+pid1 = spawn fn -> Main.pingponger("pinger") end
+pid2 = spawn fn -> Main.pingponger("ponger") end
+send pid1, {:ping, 10, pid2}
+								```
+							</textarea>
+						</section>
+	
+						<section data-markdown>
+							<textarea data-template>
+								### Scala / Akka untyped
+	
+								```scala
+								case class Ping(count: Int)
+	
+								class Pingponger extends Actor {
+									def receive = { // Any => Unit
+										case Ping(count) =>
+											println(s"${self.path} received ping, count down $count")
+											if (count > 0) {
+												sender() ! Ping(count - 1)
+											} else {
+												System.exit(0)
+											}
+									}
+								}
+								
+								val system = ActorSystem("pingpong")
+								val pinger = system.actorOf(Props[Pingponger](), "pinger")
+								val ponger = system.actorOf(Props[Pingponger](), "ponger")
+								pinger.tell(Ping(10), ponger)
+								```
+							</textarea>
+						</section>
+	
+						<section data-markdown>
+							<textarea data-template>
+								### Scala / Akka typed
+	
+								```scala
+								case class Ping(count: Int, replyTo: ActorRef[Ping])
+	
+								object Pingponger {
+									def apply(): Behavior[Ping] = Behaviors.receive { (context, ping) =>
+										println(s"${context.self.path} received ping, count down ${ping.count}")
+										if (ping.count > 0) {
+											ping.replyTo ! Ping(ping.count - 1, context.self)
+										} else {
+											System.exit(0)
+										}
+	
+										Behaviors.same
+									}
+								}
+	
+								object Main {
+									def apply(): Behavior[NotUsed] =
+										Behaviors.setup { context =>
+											val pinger = context.spawn(Pingponger(), "pinger")
+											val ponger = context.spawn(Pingponger(), "ponger")
+											pinger ! Ping(10, ponger)
+											
+											Behaviors.empty
+										}
+								}
+	
+								ActorSystem(Main(), "PingPongDemo")
+								```
+							</textarea>
+						</section>
+					</section>
+	
+				<!--  THE ISSUE: JDK PRE-17 WITH ACTORS SUCKS -->
+				<section>
+					<section data-markdown>
+						<textarea data-template>
+            ### Java + Akka Protocol
+
+            ```java
+class Ping {
+    final int count;
+    ActorRef<Ping> replyTo;
+
+    Ping(int count, ActorRef<Ping> replyTo) {
+        this.count = count;
+        this.replyTo = replyTo;
+    }
+
+    int getCount() {
+        return count;
+    }
+
+    ActorRef<Ping> getReplyTo() {
+        return replyTo;
+    }
+}
+            ```
+						</textarea>
+					</section>
+
+					<section data-markdown>
+						<textarea data-template>
+            ### Java + Akka Implementation
+
+            ```java
+static class Pingponger extends AbstractActor {
+  @Override
+  public Receive createReceive() {
+    return receiveBuilder()
+      .match(
+        Ping.class,
+        ping -> {
+          out.println(getSelf().path() + " received ping, count down " + ping.getCount());
+          if (ping.getCount() > 0) {
+                      getSender().tell(new Ping(ping.getCount() - 1), getSelf());
+          } else {
+                      System.exit(0);
+          }
+        })
+      .build();
+  }
+}
+
+public static void main(String... args) {
+    ActorSystem system = ActorSystem.apply("pingpong");
+    ActorRef pinger = system.actorOf(Props.create(Pingponger.class), "pinger");
+    ActorRef ponger = system.actorOf(Props.create(Pingponger.class), "ponger");
+    pinger.tell(new Ping(10), ponger);
+}
+            ```
+						</textarea>
+					</section>
+
+					<!-- Discuss example -->
+					<!--  we may also show that it sucks and show all the workarounds 
+						Akka did in the past to make it nicer for Java -->
+
+					<section data-markdown>
+						<textarea data-template>
+							### Java + Akka
+
+							```java
+							@Override
+							public Receive<Greet> createReceive() {
+								return newReceiveBuilder()
+									.onMessage(Greet.class, this::onGreet)
+								.build();
+							}
+							```
+
+							https://doc.akka.io/docs/akka/2.4/java/untyped-actors.html
+						</textarea>
+					</section>
+
+					
+					<section data-markdown>
+						<textarea data-template>
+							### Akka 
+							- clunky to write in pre-17:
+
+								- no concise way to express messages
+								- no tidy syntax to match against the types of the incoming messages
+								- no tidy way to represent closed type hierarchies
+							
+						</textarea>
+					</section>
+
+
+					<section data-markdown>
+						<textarea data-template>
+							### Java 17+
+
+							- records
+							- switch expressions and pattern matching
+							- sealed type hierarchies (exhaustiveness check).
+							
+						</textarea>
+					</section>
+
+					<section data-markdown>
+						<textarea data-template>
+							### Bonus Java 19
+
+							- record patterns (destructuring match)
+							- virtual threads!
+						</textarea>
+					</section>
+
+				</section>
+
+
+				<!-- JDK 17+ TO THE RESCUE -->
+				<section>
+					<!-- JAVA 19 FEATURES -->
+
+					<section data-markdown>
+						<textarea data-template>
+							### Java 17+
+						</textarea>
+					</section>
+
+
+
+					<section data-markdown>
+						<textarea data-template>
+							### Records
+
+							```
+							record User(String name) {}
+							```
+						</textarea>
+					</section>
+
+					<!-- SEALED TYPE HIERARCHIES -->
+					<section data-markdown>
+						<textarea data-template>
+							### Sealed Type Hierarchies
+
+							```
+							sealed interface GreetingTarget {};
+							record User(String name) implements GreetingTarget {};
+							record World() implements GreetingTarget {};
+							```
+						</textarea>
+					</section>
+
+					<!-- PATTERN MATCHING -->
+					<section data-markdown>
+						<textarea data-template>
+							### Pattern matching (JDK 17)
+
+							```
+							GreetingTarget tgt = ... 
+							switch (tgt) {
+								case World w -> out.println("Hello World");
+								case User u && u.name() == "..." -> out.println("Hello " + u.name());
+							}
+							```
+						</textarea>
+					</section>
+					<section data-markdown>
+						<textarea data-template>
+							### Pattern matching (JDK 19)
+
+							```
+							GreetingTarget tgt = ... 
+							switch (tgt) {
+								case World w -> out.println("Hello World");
+								case User(var name) when (name == "...") -> out.println("Hello " + name);
+							}
+							```
+						</textarea>
+					</section>
+				</section>	
+
+
+				<section data-markdown>
+					<textarea data-template>
+						### Let's do some coding!
+					</textarea>
+				</section>
+
+			<section>
+				<section data-markdown>
+					<textarea data-template>
+						### Behavior
+						```java
+						void receive(Message m) {
+
+						}
+						```
+					</textarea>
+				</section>
+
+				<section data-markdown>
+					<textarea data-template>
+						### Behavior
+						Message → NextState
+					</textarea>
+				</section>
+
+				<section data-markdown>
+					<textarea data-template>
+						### Behavior
+						Message → Effect
+					</textarea>
+				</section>
+
+				<section data-markdown>
+					<textarea data-template>
+						### State Transition
+						State → State
+					</textarea>
+				</section>
+
+				<section data-markdown>
+					<textarea data-template>
+						### Behavior Transition
+						Behavior → Behavior
+					</textarea>
+				</section>
+
+				<section data-markdown>
+					<textarea data-template>
+						### Effect
+						Behavior → Behavior
+					</textarea>
+				</section>
+			</section>
+
+      <section data-markdown>
+        <textarea data-template>
+          # LIVE CODING
+        </textarea>
+      </section>
+
+      <section data-markdown>
+        <textarea data-template>
+          ![](imgs/voxxed.png)
+        </textarea>
+      </section>
+
+      <section data-markdown>
+        <textarea data-template>
+          # END
+        </textarea>
+      </section>
+
+			</div>
+		</div>
+
+		<script src="dist/reveal.js"></script>
+		<script src="plugin/notes/notes.js"></script>
+		<script src="plugin/markdown/markdown.js"></script>
+		<script src="plugin/highlight/highlight.js"></script>
+		<script>
+			// More info about initialization & config:
+			// - https://revealjs.com/initialization/
+			// - https://revealjs.com/config/
+			Reveal.initialize({
+				hash: true,
+				transition: 'none',
+				// Learn about plugins: https://revealjs.com/plugins/
+				plugins: [ RevealMarkdown, RevealHighlight, RevealNotes ]
+			});
+		</script>
+	</body>
+</html>
