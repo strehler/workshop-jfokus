@@ -7,7 +7,7 @@ with JBang, JDK 19, records, pattern matching and virtual threads!
 
 ## Content
 
-Slides are in the `docs` folder
+Slides are at [Google Docs](https://docs.google.com/presentation/d/11Q3rqHtK5v3zy4jQoDumaBIKeytAgWgm3AJlU2HYtIA/edit?usp=sharing)
 
 Code is in the `code` folder and solutions are in the `solution`s subfolders, don't look at them!!!
 
