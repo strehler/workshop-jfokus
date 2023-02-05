@@ -18,3 +18,8 @@ Code is in the `code` folder and solutions are in the `solution`s subfolders, do
 - `sdk install jbang`
 - `sdk install java 19.0.2-tem`
 - `git clone git@github.com:strehler/workshop-jfokus.git`
+
+### Optionally:
+- install VSCode
+- Install the [Extension Pack for Java](https://marketplace.visualstudio.com/items?itemName=vscjava.vscode-java-pack) 
+- Install the [JBang Extension](https://marketplace.visualstudio.com/items?itemName=jbangdev.jbang-vscode)
